@@ -1,0 +1,21 @@
+services:
+  mongo-lpg:
+    image: mongo:latest
+    container_name: mongo-lpg
+    ports:
+      - "27077:27017"
+    volumes:
+      - mongo-lpg-data:/data/db
+  
+  mongo-lpg-express:
+    image: mongo-express:latest
+    container_name: mongo-lpg-express
+    ports:
+      - "8082:8081"
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongo-lpg:27017
+    depends_on:
+      - mongo-lpg
+
+volumes:
+  mongo-lpg-data:
