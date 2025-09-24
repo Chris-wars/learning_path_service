@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from typing import List, Dict, Any
-from app.helper import get_json
+from .helper import get_json
 
 load_dotenv()
 
