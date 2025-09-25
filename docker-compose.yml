@@ -1,6 +1,75 @@
 services:
+
+# Resource Catalog stack
+
+  mongo-rc:
+    image: mongo:8
+    container_name: mongo-rc
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-rc-data:/data/db
+
+  mongo-rc-express:
+    image: mongo-express:1.0.2
+    container_name: mongo-rc-express
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_URL=mongodb://mongo-rc:27017
+    depends_on:
+      - mongo-rc
+
+  resource-catalog:
+    build:
+      context: ../resource_catalog_service_example_fork
+      dockerfile: Dockerfile
+    image: "resource_catalog"
+    container_name: resource-catalog
+    environment:
+      - PORT=5002
+      - MONGO_URI=mongodb://mongo-rc:27017
+      - MONGO_DB=resource_catalog
+    ports:
+      - "5002:5002"
+    depends_on:
+      - mongo-rc
+
+  # Topics & Skills stack
+
+  pg-topics:
+    image: postgres:17
+    container_name: pg-topics
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app123
+      POSTGRES_DB: topics_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-topics-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d topics_db"]
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 15s
+
+  topics-skills:
+    build:
+      context: ../topic_skill_service_example_fork
+      dockerfile: Dockerfile
+    image: "topics_skills"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://app:app123@pg-topics:5432/topics_db
+    ports:
+      - "5000:5000"
+    depends_on:
+      - pg-topics
+
+ # Learning Path Generator stack
   mongo-lpg:
-    image: mongo:latest
+    image: mongo:8
     container_name: mongo-lpg
     ports:
       - "27077:27017"
@@ -8,7 +77,7 @@ services:
       - mongo-lpg-data:/data/db
   
   mongo-lpg-express:
-    image: mongo-express:latest
+    image: mongo-express:1.0.2
     container_name: mongo-lpg-express
     ports:
       - "8082:8081"
@@ -17,5 +86,29 @@ services:
     depends_on:
       - mongo-lpg
 
+  learning-path:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: "learning_path"
+    container_name: learning-path
+    environment:
+      - PORT=8000
+      - TOPICS_API_BASE_URL=http://topics-skills:5000
+      - RESOURCES_API_BASE_URL=http://resource-catalog:5002
+      - MONGO_URI=mongodb://mongo-lpg:27017
+      - MONGO_DB=learning_paths
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
+      - OPENAI_TEMPERATURE=0.1
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mongo-lpg
+      - topics-skills
+      - resource-catalog
+
 volumes:
   mongo-lpg-data:
+  mongo-rc-data:
+  pg-topics-data:

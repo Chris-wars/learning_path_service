@@ -8,7 +8,7 @@ from .db import mongo, paths, ping
 from .clients import fetch_topics, fetch_skills, fetch_resources
 from .llm import ask_openai_for_plan
 from .models import GenerateRequest, LearningPath, Milestone
-from .helpers import gen_id, now_dt
+from .helper import gen_id, now_dt
 
 load_dotenv()
 
