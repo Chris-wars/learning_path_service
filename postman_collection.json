@@ -1,0 +1,187 @@
+{
+  "info": {
+    "_postman_id": "b15b0d1f-86b5-49b5-8f3b-2c6d2e0b1abc",
+    "name": "Learning Path Generator - Simple",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Basic requests to exercise the Learning Path Generator service (health, generate, fetch by id, list)."
+  },
+  "item": [
+    {
+      "name": "Health - GET /healthz",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Generate Path - POST /generate",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "// Store the pathId for later requests",
+              "try {",
+              "  const json = pm.response.json();",
+              "  if (json && json.pathId) {",
+              "    pm.collectionVariables.set('lastPathId', json.pathId);",
+              "  }",
+              "} catch(e) {",
+              "  // ignore",
+              "}",
+              "",
+              "// Basic assertions",
+              "pm.test('Status is 200/201', function () {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201]);",
+              "});",
+              "pm.test('Has pathId', function () {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j).to.have.property('pathId');",
+              "});",
+              "pm.test('Has milestones array', function () {",
+              "  const j = pm.response.json();",
+              "  pm.expect(j).to.have.property('milestones');",
+              "  pm.expect(j.milestones).to.be.an('array');",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"demo-user\",\n  \"desiredSkills\": [\"HTML Structure\", \"Flexbox\", \"Promises & Async/Await\"],\n  \"desiredTopics\": [\"Web Development Fundamentals\", \"Python Programming\"]\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/generate",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "generate"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Path by ID - GET /paths/:pathId (uses {{lastPathId}})",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "exec": [
+              "// Fail fast if lastPathId is missing",
+              "if (!pm.collectionVariables.get('lastPathId')) {",
+              "  console.warn('lastPathId is not set. Run \"Generate Path\" first.');",
+              "}"
+            ],
+            "type": "text/javascript"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status 200', function () {",
+              "  pm.response.to.be.ok;",
+              "});",
+              "pm.test('Matches requested pathId', function () {",
+              "  const expected = pm.collectionVariables.get('lastPathId');",
+              "  const j = pm.response.json();",
+              "  pm.expect(j.pathId).to.eql(expected);",
+              "});"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/paths/{{lastPathId}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "paths",
+            "{{lastPathId}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Paths - GET /paths",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/paths",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "paths"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "List Paths by User - GET /paths?userId=demo-user",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/paths?userId=demo-user",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "paths"
+          ],
+          "query": [
+            {
+              "key": "userId",
+              "value": "demo-user"
+            }
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8000",
+      "type": "string"
+    },
+    {
+      "key": "lastPathId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
