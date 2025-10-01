@@ -4,9 +4,9 @@ from fastapi import FastAPI, HTTPException, Query, Path, Body
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-from .db import mongo, paths, ping
-from .clients import fetch_topics, fetch_skills, fetch_resources
-from .llm import ask_openai_for_plan
+from . import db
+from . import clients
+from . import llm
 from .models import GenerateRequest, LearningPath, Milestone
 from .helper import gen_id, now_dt
 
@@ -23,15 +23,26 @@ app.add_middleware(
     allow_headers=["*"]
 )
 
+
+@app.get("/paths/{pathId}", response_model=LearningPath)
+def get_path(pathId: str):
+    print("[DEBUG][get_path] called with pathId:", pathId)
+    item = db.paths.find_one({"pathId": pathId})
+    if not item:
+        raise HTTPException(404, "Not Found")
+    item.pop("_id", None)
+    return item
+
 @app.get("/")
 def root():
     return {"service": "learning-path-generator", "docs":"/docs", "health": "/healthz"}
 
 
+
 @app.get("/healthz")
 def healthz():
     try:
-        ping()
+        db.ping()
     except Exception as e:
         raise HTTPException(500, f"Mongo database down: {e}")
     return {"status": "ok", "db": "up"}
@@ -40,34 +51,25 @@ def healthz():
 @app.post("/generate", response_model=LearningPath)
 def generate_path(body: GenerateRequest = Body(...)):
     try:
-        topics = fetch_topics()
-        skills = fetch_skills()
-        resources = fetch_resources()
+        topics = clients.fetch_topics()
+        skills = clients.fetch_skills()
+        resources = clients.fetch_resources()
     except Exception as e:
         raise HTTPException(502, f"Upstream error: {e}")
-    
+
     try:
-        plan = ask_openai_for_plan(
+        plan = llm.ask_openai_for_plan(
             body.desiredSkills,
             body.desiredTopics,
             topics,
             skills,
             resources
-            )
+        )
     except Exception as e:
         raise HTTPException(502, f"OpenAI error: {e}")
-    
-    milestones: List[Dict[str, Any]] = []
-    for idx, milestone in enumerate(plan.get("milestones", []), start=1):
-        milestones.append({
-            "milestoneId": milestone.get("milestoneId") or f"m{idx}",
-            "type": milestone.get("type"),
-            "label": milestone.get("label"),
-            "skillId": milestone.get("skillId"),
-            "topicId": milestone.get("topicId"),
-            "resources": milestone.get("resources", []),
-            "status": milestone.get("status", "pending")
-        })
+
+
+    milestones = plan.get("milestones", [])
 
     doc = {
         "pathId": gen_id("lp"),
@@ -79,8 +81,8 @@ def generate_path(body: GenerateRequest = Body(...)):
         "updatedAt": now_dt()
     }
 
-    paths.insert_one(doc)
-
+    db.paths.insert_one(doc)
+    return doc
     doc.pop("_id", None)
     return doc
 
@@ -92,23 +94,12 @@ def list_paths(userId: Optional[str] = Query(None)):
     if userId:
         query["userId"] = userId
     
-    items = list(paths.find(query).sort("createdAt", -1))
+    items = list(db.paths.find(query).sort("createdAt", -1))
 
     for item in items:
         item.pop("_id", None)
 
+    # Liste aller gespeicherten Lernpfade zurückgeben
     return items
-
-
-@app.get("/paths/{pathId}", response_model=LearningPath)
-def get_path(pathId: str = Path(...)):
-    item = paths.find_one({"pathId": pathId})
-
-    if not item:
-        raise HTTPException(404, "Not found")
-    
-    item.pop("_id", None)
-
-    return item
 
 
